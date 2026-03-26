@@ -10,7 +10,7 @@
 | contains the "web" middleware group. Now create something great!
 |
 */
-        /*-------------------- Use case connexion---------------------------*/
+        /*-------------------- Use case connexion visiteur ---------------------------*/
 Route::get('/',[
         'as' => 'chemin_connexion',
         'uses' => 'connexionController@connecter'
@@ -24,6 +24,8 @@ Route::get('deconnexion',[
         'as'=>'chemin_deconnexion',
         'uses'=>'connexionController@deconnecter'
 ]);
+
+
 
          /*-------------------- Use case état des frais---------------------------*/
 Route::get('selectionMois',[
@@ -48,5 +50,27 @@ Route::post('sauvegarderFrais',[
         'uses'=>'gererFraisController@sauvegarderFrais'
 ]);
 
+
+Route::get('ajoutFrais',[
+        'as'=>'chemin_ajoutFrais',
+        'uses'=>'gererFraisController@Validerpaiement'
+]);
+
+
+/* Routes comptable: voir la liste, consulter une fiche et télécharger en PDF */
+Route::get('comptable/fiches',[
+        'as' => 'comptable.fiches',
+        'uses' => 'gererFraisController@Validerpaiement'
+]);
+
+Route::get('comptable/fiche/{idVisiteur}/{mois}',[
+        'as' => 'comptable.voirFiche',
+        'uses' => 'gererFraisController@voirFiche'
+]);
+
+Route::get('comptable/fiche/{idVisiteur}/{mois}/pdf',[
+        'as' => 'comptable.telechargerPdf',
+        'uses' => 'gererFraisController@telechargerPdf'
+]);
 
 

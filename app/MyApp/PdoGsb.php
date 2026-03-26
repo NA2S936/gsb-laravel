@@ -43,6 +43,22 @@ class PdoGsb{
 	}
 
 
+	/**
+ * Retourne les informations d'un visiteur
+ 
+ * @param $login 
+ * @param $mdp
+ * @return l'id, le nom et le prénom sous la forme d'un tableau associatif 
+*/
+	public function getInfosComptable($login, $mdp){
+		$req = "select comptable.id as id, comptable.nom as nom, comptable.prenom as prenom from comptable 
+        where comptable.login='" . $login . "' and comptable.mdp='" . $mdp ."'";
+    	$rs = $this->monPdo->query($req);
+		$ligne = $rs->fetch();
+		return $ligne;
+	}
+
+
 
 /**
  * Retourne sous forme d'un tableau associatif toutes les lignes de frais au forfait
@@ -213,6 +229,23 @@ class PdoGsb{
 
 
 
+		public function getLesFichesValider(){
+	 $req = "select fichefrais.idVisiteur as idVisiteur, fichefrais.mois as mois, fichefrais.montantValide as montantValide,
+    fichefrais.dateModif as dateModif, visiteur.nom as nom, visiteur.prenom as prenom, etat.libelle as libEtat
+    from  fichefrais inner join visiteur on fichefrais.idVisiteur = visiteur.id
+    inner join etat on fichefrais.idEtat = etat.id
+    where fichefrais.idEtat ='VA'
+    order by fichefrais.mois desc ";
+    $res = $this->monPdo->query($req);
+		$lesFiches =array();
+		$laLigne = $res->fetch();
+		while($laLigne != null){
+				$lesFiches[] = $laLigne;
+				$laLigne = $res->fetch();
+		}
+		return $lesFiches;
 
-
+	}
 }
+
+	

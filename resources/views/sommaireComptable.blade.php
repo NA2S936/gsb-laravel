@@ -7,18 +7,12 @@
              </div>  
                <ul id="menuList">
                    <li >
-                    @if(isset($comptable))
-                    Bonjour {{ $comptable['nom'] . ' ' . $comptable['prenom'] }}
-@elseif(isset($visiteur))
-    Bonjour {{ $visiteur['nom'] . ' ' . $visiteur['prenom'] }}
-@endif
+                    
+                    <strong>Bonjour {{ $comptable['nom'] . ' ' . $comptable['prenom'] }}</strong>
                       
                    </li>
                   <li class="smenu">
-                     <a href="{{ route('chemin_gestionFrais')}}" title="Saisie fiche de frais ">Saisie fiche de frais</a>
-                  </li>
-                  <li class="smenu">
-                    <a href="{{ route('chemin_selectionMois') }}" title="Consultation de mes fiches de frais">Mes fiches de frais</a>
+                     <a href="{{ route('chemin_ajoutFrais')}}" title="Validation d’une fiche de frais ">Validation d’une fiche de frais</a>
                   </li>
                <li class="smenu">
                 <a href="{{ route('chemin_deconnexion') }}" title="Se déconnecter">Déconnexion</a>
@@ -28,3 +22,4 @@
         </div>
     
       @endsection          
+
