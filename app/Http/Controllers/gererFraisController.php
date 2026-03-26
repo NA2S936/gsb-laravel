@@ -1,189 +1,106 @@
 <?php
 
 namespace App\Http\Controllers;
+
 use Illuminate\Http\Request;
-use PdoGsb;
-use MyDate;
-class gererFraisController extends Controller{
+use App\MyApp\PdoGsb;
+use Session;
+use Barryvdh\DomPDF\Facade\Pdf;
 
-    function saisirFrais(Request $request){
-        if( session('visiteur') != null){
-            $visiteur = session('visiteur');
+class gererFraisController extends Controller
+{
+    public function saisirFrais(Request $request) {
+        if (Session::has('visiteur')) {
+            $visiteur = Session::get('visiteur');
             $idVisiteur = $visiteur['id'];
-            $anneeMois = MyDate::getAnneeMoisCourant();
-            $mois = $anneeMois['mois'];
-            if(PdoGsb::estPremierFraisMois($idVisiteur,$mois)){
-                 PdoGsb::creeNouvellesLignesFrais($idVisiteur,$mois);
+            $mois = date("Ym");
+            $pdo = PdoGsb::getPdoGsb();
+            if ($pdo->estPremierFraisMois($idVisiteur, $mois)) {
+                $pdo->creeNouvellesLignesFrais($idVisiteur, $mois);
             }
-            $lesFrais = PdoGsb::getLesFraisForfait($idVisiteur,$mois);
-            $view = view('majFraisForfait')
-                    ->with('lesFrais', $lesFrais)
-                    ->with('numMois',$anneeMois['numMois'])
-                    ->with('erreurs',null)
-                    ->with('numAnnee',$anneeMois['numAnnee'])
-                    ->with('visiteur',$visiteur)
-                    ->with('message',"")
-                    ->with ('method',$request->method());
-            return $view;
+            $lesFrais = $pdo->getLesFraisForfait($idVisiteur, $mois);
+            return view('modeles.majFraisForfait')
+                ->with('lesFrais', $lesFrais)->with('numMois', date("m"))->with('numAnnee', date("Y"))
+                ->with('visiteur', $visiteur)->with('erreurs', null)->with('message', "");
         }
-        else{
-            return view('connexion')->with('erreurs',null);
-        }
-    }
-    function sauvegarderFrais(Request $request){
-        if( session('visiteur')!= null){
-            $visiteur = session('visiteur');
-            $idVisiteur = $visiteur['id'];
-            $anneeMois = MyDate::getAnneeMoisCourant();
-            $mois = $anneeMois['mois'];
-            $lesFrais = $request['lesFrais'];
-            $lesLibFrais = $request['lesLibFrais'];
-            $nbNumeric = 0;
-            foreach($lesFrais as $unFrais){
-                if(is_numeric($unFrais))
-                    $nbNumeric++;
-            }
-            $view = view('majFraisForfait')->with('lesFrais', $lesFrais)
-                    ->with('numMois',$anneeMois['numMois'])
-                    ->with('numAnnee',$anneeMois['numAnnee'])
-                    ->with('visiteur',$visiteur)
-                    ->with('lesLibFrais',$lesLibFrais)
-                    ->with ('method',$request->method());
-            if($nbNumeric == 4){
-                $message = "Votre fiche a été mise à jour";
-                $erreurs = null;
-                PdoGsb::majFraisForfait($idVisiteur,$mois,$lesFrais);
-        	}
-		    else{
-                $erreurs[] ="Les valeurs des frais doivent être numériques";
-                $message = '';
-            }
-            return $view->with('erreurs',$erreurs)
-                        ->with('message',$message);
-        }
-        else{
-            return view('connexion')->with('erreurs',null);
-        }
+        return redirect()->route('chemin_connexion');
     }
 
-    public function validerFrais(Request $request){
-        if( session('visiteur')!= null){
-            $visiteur = session('visiteur');
+    public function sauvegarderFrais(Request $request) {
+        if (Session::has('visiteur')) {
+            $visiteur = Session::get('visiteur');
             $idVisiteur = $visiteur['id'];
-            $anneeMois = MyDate::getAnneeMoisCourant();
-            $mois = $anneeMois['mois'];
-            $lesFrais = PdoGsb::getLesFraisForfait($idVisiteur,$mois);
-            $lesLibFrais = PdoGsb::getLibelleFrais();
-            $view = view('majFraisForfait')->with('lesFrais', $lesFrais)
-                    ->with('numMois',$anneeMois['numMois'])
-                    ->with('numAnnee',$anneeMois['numAnnee'])
-                    ->with('visiteur',$visiteur)
-                    ->with('lesLibFrais',$lesLibFrais)
-                    ->with ('method',$request->method())
-                    ->with('erreurs',null)
-                    ->with('message',"Votre fiche a été validée");
-            PdoGsb::validerFicheFrais($idVisiteur,$mois);
-            return $view;
+            $mois = date("Ym");
+            $lesFrais = $request->input('lesFrais');
+            $pdo = PdoGsb::getPdoGsb();
+            $pdo->majFraisForfait($idVisiteur, $mois, $lesFrais);
+            return redirect()->route('chemin_gestionFrais');
         }
-        else{
-            return view('connexion')->with('erreurs',null);
-        }
+        return redirect()->route('chemin_connexion');
     }
 
-    public function Validerpaiement(Request $request){
-    if(session('comptable') != null){
-        $comptable = session('comptable');
+    public function Validerpaiement(Request $request) {
+        if (Session::has('comptable')) {
+            $comptable = Session::get('comptable');
+            $pdo = PdoGsb::getPdoGsb(); 
+            $lesVisiteurs = $pdo->getLesVisiteurs();
+            $lesMois = $pdo->getTousLesMoisDisponibles();
+            $idVisiteurSelectionne = $request->get('idVisiteur');
+            $leMoisSelectionne = $request->get('lstMois');
+            $lesFiches = [];
 
-        $pdo = new \App\MyApp\PdoGsb();
+            if ($idVisiteurSelectionne && $leMoisSelectionne) {
+                $ficheTrouvee = $pdo->getLesInfosFicheFrais($idVisiteurSelectionne, $leMoisSelectionne);
+                if ($ficheTrouvee) {
+                    // On récupère les infos du visiteur pour ne pas avoir d'erreur "Undefined key nom"
+                    $infosVisiteur = null;
+                    foreach($lesVisiteurs as $v) {
+                        if($v['id'] == $idVisiteurSelectionne) { $infosVisiteur = $v; break; }
+                    }
+                    $ficheTrouvee['idVisiteur'] = $idVisiteurSelectionne;
+                    $ficheTrouvee['mois'] = $leMoisSelectionne;
+                    $ficheTrouvee['nom'] = $infosVisiteur['nom'];
+                    $ficheTrouvee['prenom'] = $infosVisiteur['prenom'];
+                    $lesFiches[] = $ficheTrouvee;
+                }
+            }
+            return view('modeles.ValidationFicheFrais')
+                ->with('lesVisiteurs', $lesVisiteurs)->with('lesMois', $lesMois)->with('lesFiches', $lesFiches)
+                ->with('idVisiteurSelectionne', $idVisiteurSelectionne)->with('leMoisSelectionne', $leMoisSelectionne)->with('comptable', $comptable);
+        }
+        return redirect()->route('chemin_connexion');
+    }
 
-        // Récupère toutes les fiches à valider
-        $lesFiches = $pdo->getLesFichesValider();
+    public function voirFiche($idVisiteur, $mois) {
+        if (Session::has('comptable')) {
+            $comptable = Session::get('comptable');
+            $pdo = PdoGsb::getPdoGsb();
+            $lesFraisForfait = $pdo->getLesFraisForfait($idVisiteur, $mois);
+            $lesFraisHorsForfait = $pdo->getLesFraisHorsForfait($idVisiteur, $mois);
+            return view('modeles.ficheComptable')
+                ->with('lesFraisForfait', $lesFraisForfait)->with('lesFraisHorsForfait', $lesFraisHorsForfait)
+                ->with('idVisiteur', $idVisiteur)->with('mois', $mois)->with('comptable', $comptable);
+        }
+        return redirect()->route('chemin_connexion');
+    }
 
-        // Récupère tous les mois disponibles pour le comptable/visiteur
-        $lesMois = $pdo->getLesMoisDisponibles($comptable['id']); // si tu veux les mois
+    public function validerFiche($idVisiteur, $mois) {
+        if (Session::has('comptable')) {
+            $pdo = PdoGsb::getPdoGsb();
+            $pdo->validerFicheFrais($idVisiteur, $mois);
+            return redirect()->route('comptable.fiches');
+        }
+        return redirect()->route('chemin_connexion');
+    }
 
-        // Choisir le mois par défaut (le plus récent)
-        $leMois = !empty($lesMois) ? array_key_first($lesMois) : null;
-
-        return view('ValidationFicheFrais')
-            ->with('lesFiches', $lesFiches)
-            ->with('lesMois', $lesMois)
-            ->with('leMois', $leMois)
-            ->with('comptable', $comptable);
-
-    } else{
-        return view('connexion')->with('erreurs', null);
+    public function telechargerPdf($idVisiteur, $mois) {
+        $pdo = PdoGsb::getPdoGsb();
+        $lesFraisForfait = $pdo->getLesFraisForfait($idVisiteur, $mois);
+        $lesFraisHorsForfait = $pdo->getLesFraisHorsForfait($idVisiteur, $mois);
+        $pdf = Pdf::loadView('modeles.fichePdf', [
+            'lesFraisForfait' => $lesFraisForfait, 'lesFraisHorsForfait' => $lesFraisHorsForfait,
+            'idVisiteur' => $idVisiteur, 'mois' => $mois
+        ]);
+        return $pdf->download('Fiche_Frais_'.$idVisiteur.'.pdf');
     }
 }
-
-
-    /**
-     * Affiche les détails d'une fiche pour un comptable
-     * URL: /comptable/fiche/{idVisiteur}/{mois}
-     */
-    public function voirFiche($idVisiteur, $mois){
-        if(session('comptable') != null){
-            $comptable = session('comptable');
-            $pdo = new \App\MyApp\PdoGsb();
-            $lesInfos = $pdo->getLesInfosFicheFrais($idVisiteur, $mois);
-            $lesFraisForfait = $pdo->getLesFraisForfait($idVisiteur, $mois);
-            return view('ficheComptable')
-                ->with('lesInfos', $lesInfos)
-                ->with('lesFraisForfait', $lesFraisForfait)
-                ->with('idVisiteur', $idVisiteur)
-                ->with('mois', $mois)
-                ->with('comptable', $comptable);
-        } else {
-            return view('connexion')->with('erreurs', null);
-        }
-    }
-
-    /**
-     * Télécharge la fiche en PDF. Si la librairie DOMPDF (barryvdh) est installée, génère un vrai PDF.
-     * Sinon renvoie la vue en téléchargement HTML comme solution de secours.
-     */
-    public function telechargerPdf($idVisiteur, $mois){
-        if(session('comptable') != null){
-            $pdo = new \App\MyApp\PdoGsb();
-            $lesInfos = $pdo->getLesInfosFicheFrais($idVisiteur, $mois);
-            $lesFraisForfait = $pdo->getLesFraisForfait($idVisiteur, $mois);
-            $data = [
-                'lesInfos' => $lesInfos,
-                'lesFraisForfait' => $lesFraisForfait,
-                'idVisiteur' => $idVisiteur,
-                'mois' => $mois,
-            ];
-
-            // Si la facade existe (package barryvdh/laravel-dompdf installé)
-            if(class_exists('Barryvdh\\DomPDF\\Facade\\Pdf')){
-                $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('fichePdf', $data);
-                $filename = 'fiche_'.$idVisiteur.'_'.$mois.'.pdf';
-                return $pdf->download($filename);
-            }
-
-            // Sinon, proposer le rendu HTML en téléchargement (solution de secours)
-            $html = view('fichePdf')->with($data)->render();
-            $filename = 'fiche_'.$idVisiteur.'_'.$mois.'.html';
-            return response($html)
-                ->header('Content-Type', 'text/html')
-                ->header('Content-Disposition', 'attachment; filename="'.$filename.'"');
-        }
-        return view('connexion')->with('erreurs', null);
-    }
-
-
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
